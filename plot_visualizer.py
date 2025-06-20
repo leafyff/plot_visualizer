@@ -1,9 +1,11 @@
 """
 TO BE DONE:
 - Input of multiple functions
-- Complete LaTeX parser
+- Complete LaTeX parser (Tree-sitter)
 - Automatic domain recogniser (use wolfram alpha?)
+- App creation (Textual)
 - Implement gamma function and others
+- Add readable ReadMe.md
 """
 
 import numpy as np
@@ -28,6 +30,7 @@ FUNC_REPLACEMENTS = {
     r'\bln\b': 'np.log',
     r'\bsqrt\b': 'np.sqrt',
     r'\bpi\b': 'np.pi',
+    r'\babs\b': 'np.abs'
 }
 
 LATEX_REPLACEMENTS = {
@@ -149,7 +152,7 @@ def main():
     plt.grid(True)
     plt.ylim(y1, y2)
     plt.show()
-    plt.savefig(f"func_plot.png", dpi=300)
+    # plt.savefig(f"func_plot.png", dpi=300)
 
 if __name__ == "__main__":
     try:
