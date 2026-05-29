@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import sys
+from tokenize import TokenError
 
 import matplotlib
 
@@ -47,6 +48,16 @@ PROBE_QUALITY = 2000   # samples used by the numerical fallback probe
 DEFAULT_X_BORDERS = (-12.0, 12.0)
 DEFAULT_Y_BORDERS = (-12.0, 12.0)
 INFINITY_RANGE = (-1000.0, 1000.0)
+
+# Failures we treat as "this expression is unusable" rather than crashing:
+# parser errors plus the many ways SymPy's symbolic routines (continuous_domain,
+# set algebra) bail on exotic inputs. Anything listed here degrades gracefully —
+# skip the offending curve, or fall back to the numerical probe.
+_SAFE_ERRORS = (
+    ArithmeticError, AttributeError, IndexError, KeyError,
+    NotImplementedError, RecursionError, SyntaxError, TypeError, ValueError,
+    TokenError, sp.PolynomialError, sp.SympifyError, sp.PoleError,
+)
 
 _X = sp.Symbol('x', real=True)
 
@@ -252,7 +263,7 @@ def _domain(expr: sp.Expr):
     """Continuous real domain of ``expr``, or ``None`` if symbolic analysis fails."""
     try:
         return continuous_domain(expr, _X, sp.S.Reals)
-    except Exception:
+    except _SAFE_ERRORS:
         return None
 
 
@@ -274,7 +285,7 @@ def _domain_to_x_borders(domain) -> tuple[float, float] | None:
         if default_iv.is_subset(domain):
             return DEFAULT_X_BORDERS
         active = domain.intersect(default_iv)
-    except Exception:
+    except _SAFE_ERRORS:
         return None
 
     if active is sp.S.EmptySet or active.is_empty:
@@ -282,16 +293,16 @@ def _domain_to_x_borders(domain) -> tuple[float, float] | None:
         try:
             d_inf = float(domain.inf) if domain.inf.is_finite else None
             d_sup = float(domain.sup) if domain.sup.is_finite else None
-        except Exception:
+        except _SAFE_ERRORS:
             return None
         if d_inf is not None and d_sup is not None:
             span = d_sup - d_inf
             pad = 0.05 * span if span > 0 else 0.5
-            return (d_inf - pad, d_sup + pad)
+            return d_inf - pad, d_sup + pad
         if d_inf is not None:
-            return (d_inf - 0.05 * default_width, d_inf + default_width)
+            return d_inf - 0.05 * default_width, d_inf + default_width
         if d_sup is not None:
-            return (d_sup - default_width, d_sup + 0.05 * default_width)
+            return d_sup - default_width, d_sup + 0.05 * default_width
         return None
 
     # Function has some presence in the default window.
@@ -304,7 +315,7 @@ def _domain_to_x_borders(domain) -> tuple[float, float] | None:
         if span >= 0.95 * default_width:
             return DEFAULT_X_BORDERS
         pad = 0.05 * span if span > 0 else 0.5
-        return (a_lo - pad, a_hi + pad)
+        return a_lo - pad, a_hi + pad
 
     # Multi-interval (``1/x``, ``tan(x)``, ``sqrt(x^2 - 25)``, ...) — use the
     # default window and let asymptote-breaking handle the gaps.
@@ -355,18 +366,18 @@ def _adapt_x_from_probe(fx_lo, fx_hi, probe_range):
         if span <= 0:
             return DEFAULT_X_BORDERS
         pad = 0.05 * span
-        return (fx_lo - pad, fx_hi + pad)
+        return fx_lo - pad, fx_hi + pad
 
     if not touches_lo and not touches_hi:
         span = fx_hi - fx_lo
         if span <= 0:
             return DEFAULT_X_BORDERS
         pad = 0.05 * span
-        return (fx_lo - pad, fx_hi + pad)
+        return fx_lo - pad, fx_hi + pad
     if touches_hi and not touches_lo:
-        return (fx_lo - 0.05 * default_width, fx_lo + default_width)
+        return fx_lo - 0.05 * default_width, fx_lo + default_width
     if touches_lo and not touches_hi:
-        return (fx_hi - default_width, fx_hi + 0.05 * default_width)
+        return fx_hi - default_width, fx_hi + 0.05 * default_width
     return DEFAULT_X_BORDERS
 
 
@@ -383,11 +394,11 @@ def _adapt_y(fy_lo: float, fy_hi: float) -> tuple[float, float]:
         value = 0.5 * (fy_lo + fy_hi)
         if dy_lo <= value <= dy_hi:
             return DEFAULT_Y_BORDERS
-        return (value - 1.0, value + 1.0)
+        return value - 1.0, value + 1.0
 
     if fy_lo > dy_hi or fy_hi < dy_lo:
         pad = 0.1 * span
-        return (fy_lo - pad, fy_hi + pad)
+        return fy_lo - pad, fy_hi + pad
 
     y_lo = max(fy_lo, dy_lo)
     y_hi = min(fy_hi, dy_hi)
@@ -395,7 +406,7 @@ def _adapt_y(fy_lo: float, fy_hi: float) -> tuple[float, float]:
     if capped >= 0.9 * default_span:
         return DEFAULT_Y_BORDERS
     pad = 0.1 * capped
-    return (y_lo - pad, y_hi + pad)
+    return y_lo - pad, y_hi + pad
 
 
 def _resolve_x_borders(expr: sp.Expr, func) -> tuple[float, float]:
@@ -568,8 +579,8 @@ def render_plot(curves,
         try:
             expr = _parse(text)
             func = _compile(expr)
-        except Exception as e:
-            errors.append(f"curve {i + 1} ({text!r}): {e}")
+        except _SAFE_ERRORS as exc:
+            errors.append(f"curve {i + 1} ({text!r}): {exc}")
             continue
         parsed.append({'expr': expr, 'func': func, 'color': color, 'text': text})
 

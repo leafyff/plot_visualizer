@@ -1,5 +1,12 @@
 # plot_visualizer
 
+### 🔗 Live app: **https://leafyff.github.io/plot_visualizer/**
+
+Plot math functions right in your browser — no install, no server. Type an
+expression, get an instant graph.
+
+---
+
 A small command-line tool for plotting mathematical functions of one variable.
 You type an expression in a Wolfram-like syntax (e.g. `x*sin(x)`,
 `2*ln(x)*sin(x^2)/x + 2*arctg(x)`), the script parses it with

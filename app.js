@@ -1,5 +1,8 @@
 "use strict";
 
+/* global loadPyodide */
+// `loadPyodide` is provided by the external pyodide.js script tag.
+
 const PYODIDE_VERSION = "0.26.4";
 const PYODIDE_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 const DEBOUNCE_MS = 250;
@@ -22,8 +25,10 @@ const PACKAGES = [
 
 const $ = (id) => document.getElementById(id);
 
+/** @type {any} */ // PyodideAPI instance (untyped — provided by pyodide.js)
 let pyodide = null;
-let renderPlot = null;          // owned PyProxy of plot_visualizer.render_plot
+/** @type {any} */ // owned PyProxy of plot_visualizer.render_plot
+let renderPlot = null;
 let pendingTimer = null;
 let lastBlobUrl = null;
 
@@ -166,8 +171,6 @@ function render() {
   try {
     proxy = renderPlot(curves, xBorders, yBorders, title);
     const result = proxy.toJs({ dict_converter: Object.fromEntries });
-    proxy.destroy();
-    proxy = null;
 
     showImage(result.png);
 
@@ -180,14 +183,14 @@ function render() {
       $("yhi").value = formatBorder(result.y2);
     }
 
-    setError((result.errors && result.errors.length > 0)
-      ? result.errors.join("\n")
-      : "");
+    const hasErrors = result.errors && result.errors.length > 0;
+    setError(hasErrors ? result.errors.join("\n") : "");
   } catch (e) {
-    if (proxy) {
-      try { proxy.destroy(); } catch (_) { /* ignore */ }
-    }
     setError(shortenPythonError(e.message || String(e)));
+  } finally {
+    // `result` is an independent JS copy, so the proxy is safe to free here
+    // whether rendering succeeded or threw.
+    if (proxy) proxy.destroy();
   }
 }
 
@@ -216,6 +219,28 @@ function setControlsEnabled(enabled) {
 // Pyodide boot — sequential package loads so each lib name shows in the modal
 // ---------------------------------------------------------------------------
 
+// Loads the runtime, math packages, and the Python module. Throws on failure;
+// kept separate from boot() so the throw isn't caught in the same scope.
+async function loadEnvironment() {
+  showLoader("the runtime", "First load is ~10 MB — afterwards it's cached.");
+  pyodide = await loadPyodide({ indexURL: PYODIDE_BASE });
+
+  for (const pkg of PACKAGES) {
+    showLoader(pkg.label, `Fetching ${pkg.label} from the CDN…`);
+    await pyodide.loadPackage([pkg.name]);
+  }
+
+  showLoader("the visualizer", "Wiring up the application module…");
+  const resp = await fetch("plot_visualizer.py", { cache: "no-cache" });
+  if (!resp.ok) {
+    throw new Error(`Could not load plot_visualizer.py (HTTP ${resp.status} ${resp.statusText})`);
+  }
+  pyodide.FS.writeFile("plot_visualizer.py", await resp.text());
+  // Owned PyProxy: copy into a top-level global so it survives independently.
+  pyodide.runPython("from plot_visualizer import render_plot as _render_plot");
+  renderPlot = pyodide.globals.get("_render_plot");
+}
+
 async function boot() {
   if (location.protocol === "file:") {
     hideLoader();
@@ -228,34 +253,15 @@ async function boot() {
     return;
   }
 
-  let step = "initializing";
   try {
-    step = "loading the runtime";
-    showLoader("the runtime", "First load is ~10 MB — afterwards it's cached.");
-    pyodide = await loadPyodide({ indexURL: PYODIDE_BASE });
-
-    for (const pkg of PACKAGES) {
-      step = `loading ${pkg.label}`;
-      showLoader(pkg.label, `Fetching ${pkg.label} from the CDN…`);
-      await pyodide.loadPackage([pkg.name]);
-    }
-
-    step = "loading the visualizer";
-    showLoader("the visualizer", "Wiring up the application module…");
-    const resp = await fetch("plot_visualizer.py", { cache: "no-cache" });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-    pyodide.FS.writeFile("plot_visualizer.py", await resp.text());
-    // Owned PyProxy: copy into a top-level global so it survives independently.
-    pyodide.runPython("from plot_visualizer import render_plot as _render_plot");
-    renderPlot = pyodide.globals.get("_render_plot");
-
+    await loadEnvironment();
     setControlsEnabled(true);
     hideLoader();
     render();
   } catch (e) {
     hideLoader();
-    setError(`Failed during «${step}»:\n${e.message || e}`);
-    console.error(`[boot] step="${step}"`, e);
+    setError("Could not initialize the environment:\n" + (e.message || e));
+    console.error("[boot]", e);
   }
 }
 
@@ -281,5 +287,6 @@ document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   // Start with one curve row pre-populated (the default expression).
   addCurveRow({ expr: "x*sin(3x)" });
-  boot();
+  // boot() handles its own errors internally; the promise is intentionally not awaited.
+  void boot();
 });
