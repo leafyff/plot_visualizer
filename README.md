@@ -40,9 +40,10 @@ You will be prompted for four inputs:
 
 1. **`y = `** — the function expression.
 2. **`X borders`** — two comma- or space-separated numbers (e.g. `-5, 5`).
-   - Leave empty to use the default range `(-12, 12)`.
+   - Leave empty for **adaptive** borders: the script samples the function and trims X to where it's defined. For `sqrt(x)` you'll get roughly `(-0.6, 12.6)`; for `arcsin(x)`, `(-1.1, 1.1)`. Functions defined everywhere fall back to the default range `(-12, 12)`.
    - Type `R` to use a very wide range `(-1000, 1000)` — useful when you want to see global behavior of a quickly-shrinking function.
 3. **`Y borders`** — same format as X borders. Controls the visible vertical window via `plt.ylim`.
+   - Leave empty for **adaptive** borders: Y is fit to the observed range of the function, capped by the default `(-12, 12)` window. `sqrt(x)` gives `(-0.3, 3.9)`; `e^(-x^2)` gives `(-0.1, 1.1)`; unbounded functions like `1/x` or `tan(x)` fall back to the default.
 4. **LaTeX name** — an optional LaTeX-formatted title (inside `$...$`).
    - Leave empty to auto-generate a LaTeX title from the expression.
 
