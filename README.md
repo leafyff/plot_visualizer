@@ -1,9 +1,11 @@
 # plot_visualizer
 
 A small command-line tool for plotting mathematical functions of one variable.
-You type an expression in a Wolfram-like syntax (e.g. `x*sin(x)`, `2*ln(x)*sin(x^2)/x + 2*arctg(x)`),
-the script converts it to a NumPy expression, filters out non-finite values, and renders the
-graph with matplotlib — including an auto-generated LaTeX title.
+You type an expression in a Wolfram-like syntax (e.g. `x*sin(x)`,
+`2*ln(x)*sin(x^2)/x + 2*arctg(x)`), the script parses it with
+[SymPy](https://www.sympy.org/), figures out the visible domain automatically,
+and renders the graph with matplotlib — including a LaTeX title produced by
+`sympy.latex(expr)`.
 
 ## Examples
 
@@ -36,6 +38,41 @@ pip install -r requirements.txt
 python plot_visualizer.py
 ```
 
+## Browser version (GitHub Pages)
+
+The same Python module is also runnable in the browser via
+[Pyodide](https://pyodide.org/) — no server, no install, just a static page.
+
+### Files involved
+
+- [index.html](index.html) — UI markup
+- [style.css](style.css) — styling (dark mode included)
+- [app.js](app.js) — loads Pyodide, the math packages, and `plot_visualizer.py`,
+  then wires the inputs to `plot_visualizer.render_plot(...)` with a 250 ms debounce
+- [plot_visualizer.py](plot_visualizer.py) — same file as for CLI; the
+  `render_plot()` function returns PNG bytes plus the borders that were used
+
+### Run locally
+
+```bash
+python -m http.server 8000
+# open http://localhost:8000
+```
+
+### Deploy to GitHub Pages
+
+1. Push the repo to GitHub.
+2. **Settings → Pages → Source: Deploy from a branch → Branch: `main` / `(root)` → Save**.
+3. After ~1 minute the site is live at `https://<user>.github.io/<repo>/`.
+
+### Caveats
+
+- First load downloads ~20–30 MB (Pyodide runtime + numpy + matplotlib + sympy).
+  Cached after that — subsequent visits start in ~1 second.
+- Computation happens on the main JS thread, so very heavy expressions can
+  briefly stutter the UI. Switching to a Web Worker would fix this; not needed
+  for typical inputs.
+
 You will be prompted for four inputs:
 
 1. **`y = `** — the function expression.
@@ -51,37 +88,58 @@ Close the matplotlib window to exit, or press `Ctrl+C` in the terminal.
 
 ### Expression syntax
 
-The expression follows a relaxed, Wolfram-style syntax. The script rewrites it
-into valid NumPy code before evaluating it.
+The expression is parsed by SymPy with implicit-multiplication,
+implicit-application, function-exponentiation, and `^`-as-power transformations
+enabled. That means a wide, relaxed syntax works out of the box:
 
-| You can write | Meaning |
+**Syntax sugar**
+
+| You can write | Notes |
 | --- | --- |
-| `^` | exponentiation (rewritten to `**`) |
-| `sin`, `cos`, `tan` / `tg`, `cot` / `ctg` | trigonometric functions |
-| `arcsin`, `arccos`, `arctan` / `arctg` | inverse trig functions |
-| `ln` | natural logarithm |
-| `log(base, x)` | logarithm with arbitrary base |
-| `e^x`, `e^(expr)` | exponential function |
-| `sqrt(x)` | square root |
-| `abs(x)` | absolute value |
-| `pi`, `e` | mathematical constants |
+| `^` | exponentiation |
+| `2x`, `3sin(x)`, `(x+1)(x+2)` | implicit multiplication (no `*` needed) |
+| `sin x`, `cos x`, `tan x` | implicit function application (no parens needed) |
+| `sin^2(x)`, `cos^3 x` | function exponentiation |
+
+**Functions**
+
+| Category | Available |
+| --- | --- |
+| Trigonometric | `sin`, `cos`, `tan`/`tg`, `cot`/`ctg`, `sec`, `csc` |
+| Inverse trig | `asin`/`arcsin`, `acos`/`arccos`, `atan`/`arctan`/`arctg`, `acot` |
+| Hyperbolic | `sinh`, `cosh`, `tanh`, `coth`, `sech`, `csch`, `asinh`, `acosh`, `atanh` |
+| Exp / log / roots | `exp(x)`/`e^x`, `ln`/`log`, `log(base, x)`, `sqrt`, `cbrt` |
+| Rounding / sign | `abs`, `sign`/`sgn`, `floor`, `ceil`/`ceiling` |
+| Special | `gamma`, `factorial`, `loggamma`, `digamma`, `polygamma(n, x)`, `beta(x, a)`, `erf`, `erfc`, `zeta`, `Si`, `Ci`, `Ei`, `li`, `besselj(n, x)`, `bessely(n, x)`, `besseli(n, x)`, `besselk(n, x)`, `LambertW`/`W` |
+| Constants | `pi`, `e` |
+
+Common functions evaluate through NumPy; the special functions fall back to
+`mpmath` (so e.g. `gamma(x)` is the continuous Γ, valid for non-integers, and
+`factorial(x)` is `gamma(x+1)`). The web UI shows the same list in its
+collapsible **Function reference** panel.
 
 Examples:
 
 ```
 x^2 - 3x + 1
-sin(x)/x
+sin x / x
 e^(-x^2)
 log(2, x)
-2*ln(x)*sin(x^2)/x + 2*arctg(x)
+sin^2(x) + cos^2(x)
+2 ln(x) sin(x^2) / x + 2 arctg(x)
 ```
+
+If you write something the parser doesn't recognize as a function (e.g.
+`xsin(x)` — meant to be `x*sin(x)`), the script tells you which symbol is
+unknown rather than producing a nonsensical plot.
 
 ### Notes on the LaTeX auto-title
 
-The built-in LaTeX converter is intentionally minimal — it handles common cases
-(exponents, trig/log function names, implicit multiplication spacing) but it is
-not a full parser. If your title comes out wrong, re-run and supply a custom
-LaTeX string at the fourth prompt, e.g. `\\frac{\\sin x}{x}`.
+The title is produced by `sympy.latex(expr, inv_trig_style='full')`, so it's
+correct LaTeX for any expression SymPy understands — fractions render as
+`\frac`, roots as `\sqrt{...}`, inverse trig as `\arcsin`, and so on. If you'd
+rather supply your own, type it at the fourth prompt (without the surrounding
+`$...$`).
 
 ## Configuration
 
@@ -95,15 +153,21 @@ tweaked:
 ## How it works
 
 1. **Input** — read the expression, viewport, and optional LaTeX title from stdin.
-2. **Rewrite** — `_process` converts Wolfram-style syntax (`^`, `tg`, `ln`, `e^...`, `log(b, x)`, …) into a NumPy expression.
-3. **Sample & filter** — `_filter_function` evaluates the expression on `FUNC_QUALITY` points and drops non-finite values (division by zero, `log` of negatives, etc.) so matplotlib draws cleanly.
-4. **Title** — if no custom title is supplied, `_latex_parse` produces a LaTeX-friendly version of the original expression.
-5. **Plot** — render with matplotlib (`grid=True`, fixed Y limits, red curve).
-
-## Security note
-
-The expression is evaluated with Python's `eval` (restricted to `x` and `np`).
-This is fine for personal use, but **do not** wire this script up to untrusted
-input without first replacing `eval` with a safe expression parser
-(e.g. [`asteval`](https://pypi.org/project/asteval/) or
-[`sympy`](https://www.sympy.org/)).
+2. **Parse** — `_parse` swaps Wolfram-style `log(b, x)` to SymPy's `log(x, b)`,
+   then hands the string to `sympy.parsing.sympy_parser.parse_expr` with the
+   implicit-multiplication / implicit-application / `^`-as-power
+   transformations enabled. Free symbols other than `x` are rejected.
+3. **Compile** — `_compile` calls `sympy.lambdify(x, expr, modules='numpy')`,
+   producing a fast NumPy function. No `eval` is involved.
+4. **Adaptive borders** — when borders are left blank, `_domain` runs
+   `sympy.calculus.util.continuous_domain` to get the function's symbolic
+   domain (e.g. `Interval(30, oo)` for `sqrt(x-30)`) and turns it into a
+   sensible plot window. A numerical probe is the fallback when SymPy can't
+   decide.
+5. **Sample & break asymptotes** — `_sample` evaluates the compiled function
+   on `FUNC_QUALITY` points, drops non-finite samples, and inserts NaN at
+   vertical asymptotes (opposite signs + magnitudes far past the visible Y
+   window) so matplotlib doesn't draw a straight line across the discontinuity.
+6. **Title** — `sympy.latex(expr, inv_trig_style='full')` for the default
+   title, or the user's own LaTeX string when supplied.
+7. **Plot** — matplotlib (`grid=True`, fixed X & Y limits, red curve).

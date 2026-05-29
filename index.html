@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plot Visualizer (MatPlotLib helper)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Modal loader, shown on first boot and while components are coming in. -->
+  <div id="loader" class="loader" role="alert" aria-live="assertive">
+    <div class="loader-card">
+      <div class="loader-spinner" aria-hidden="true"></div>
+      <div class="loader-title">Wait a second, <span id="loader-lib">the runtime</span> is loading!</div>
+      <div id="loader-sub" class="loader-sub">First load is ~20–30 MB — afterwards it's cached.</div>
+    </div>
+  </div>
+
+  <div class="page-top">
+    <small class="author-link">
+      Author: <a href="https://linktr.ee/les_fox" target="_blank" rel="noopener">Leaf</a>
+    </small>
+  </div>
+
+  <header>
+    <h1>Plot Visualizer <span class="subtitle">(MatPlotLib helper)</span></h1>
+    <p class="hint">
+      Type one or more expressions — plots update automatically.
+      Everything runs in your browser; no server, no install.
+    </p>
+  </header>
+
+  <div class="layout">
+
+    <!-- Left: parameters -->
+    <aside class="controls-pane" aria-label="Parameters">
+
+      <section class="block">
+        <h2>Functions <span class="badge" id="curve-count">1/10</span></h2>
+        <div id="curves"><!-- curve rows injected by JS --></div>
+        <button id="add-curve" type="button" class="btn-secondary" disabled>
+          + add function
+        </button>
+      </section>
+
+      <section class="block">
+        <h2>Borders</h2>
+
+        <div class="axis">
+          <label class="axis-toggle">
+            <input id="autoX" type="checkbox" checked disabled>
+            <span>X — auto</span>
+          </label>
+          <div class="axis-range">
+            <input id="xlo" type="number" step="1" disabled aria-label="X min">
+            <span aria-hidden="true">…</span>
+            <input id="xhi" type="number" step="1" disabled aria-label="X max">
+          </div>
+        </div>
+
+        <div class="axis">
+          <label class="axis-toggle">
+            <input id="autoY" type="checkbox" checked disabled>
+            <span>Y — auto</span>
+          </label>
+          <div class="axis-range">
+            <input id="ylo" type="number" step="1" disabled aria-label="Y min">
+            <span aria-hidden="true">…</span>
+            <input id="yhi" type="number" step="1" disabled aria-label="Y max">
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2><label for="title">Title (LaTeX, optional)</label></h2>
+        <input id="title" type="text"
+               placeholder="leave empty for auto-generated title"
+               autocomplete="off" spellcheck="false" disabled>
+      </section>
+
+    </aside>
+
+    <!-- Right: plot -->
+    <main class="plot-pane">
+      <pre id="error" role="alert"></pre>
+      <figure>
+        <img id="plot" alt="Function plot">
+      </figure>
+    </main>
+
+  </div>
+
+  <section class="reference">
+    <details>
+      <summary>Function reference — supported syntax</summary>
+
+      <p class="ref-note">
+        Expressions support implicit multiplication (<code>2x</code>,
+        <code>3sin(x)</code>), <code>^</code> for powers, and function
+        exponentiation (<code>sin^2(x)</code>). Below, <code>x</code> is the
+        variable; <code>n</code>, <code>a</code> stand for constants.
+      </p>
+
+      <div class="ref-grid">
+
+        <table>
+          <caption>Trigonometric</caption>
+          <thead><tr><th>Function syntax</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>sin(x)</code></td><td>Sine</td></tr>
+            <tr><td><code>cos(x)</code></td><td>Cosine</td></tr>
+            <tr><td><code>tan(x)</code>, <code>tg(x)</code></td><td>Tangent</td></tr>
+            <tr><td><code>cot(x)</code>, <code>ctg(x)</code></td><td>Cotangent</td></tr>
+            <tr><td><code>sec(x)</code></td><td>Secant, 1/cos(x)</td></tr>
+            <tr><td><code>csc(x)</code></td><td>Cosecant, 1/sin(x)</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <caption>Inverse trigonometric</caption>
+          <thead><tr><th>Function syntax</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>asin(x)</code>, <code>arcsin(x)</code></td><td>Inverse sine</td></tr>
+            <tr><td><code>acos(x)</code>, <code>arccos(x)</code></td><td>Inverse cosine</td></tr>
+            <tr><td><code>atan(x)</code>, <code>arctan(x)</code>, <code>arctg(x)</code></td><td>Inverse tangent</td></tr>
+            <tr><td><code>acot(x)</code>, <code>arccot(x)</code></td><td>Inverse cotangent</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <caption>Hyperbolic</caption>
+          <thead><tr><th>Function syntax</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>sinh(x)</code></td><td>Hyperbolic sine</td></tr>
+            <tr><td><code>cosh(x)</code></td><td>Hyperbolic cosine</td></tr>
+            <tr><td><code>tanh(x)</code></td><td>Hyperbolic tangent</td></tr>
+            <tr><td><code>coth(x)</code></td><td>Hyperbolic cotangent</td></tr>
+            <tr><td><code>sech(x)</code></td><td>Hyperbolic secant</td></tr>
+            <tr><td><code>csch(x)</code></td><td>Hyperbolic cosecant</td></tr>
+            <tr><td><code>asinh(x)</code>, <code>acosh(x)</code>, <code>atanh(x)</code></td><td>Inverse hyperbolic</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <caption>Exponential, logarithmic & roots</caption>
+          <thead><tr><th>Function syntax</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>exp(x)</code>, <code>e^x</code></td><td>Exponential, eˣ</td></tr>
+            <tr><td><code>ln(x)</code>, <code>log(x)</code></td><td>Natural logarithm</td></tr>
+            <tr><td><code>log(a, x)</code></td><td>Logarithm of x to base a</td></tr>
+            <tr><td><code>sqrt(x)</code></td><td>Square root</td></tr>
+            <tr><td><code>cbrt(x)</code></td><td>Cube root</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <caption>Rounding & sign</caption>
+          <thead><tr><th>Function syntax</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>abs(x)</code></td><td>Absolute value</td></tr>
+            <tr><td><code>sign(x)</code>, <code>sgn(x)</code></td><td>Sign (−1, 0, +1)</td></tr>
+            <tr><td><code>floor(x)</code></td><td>Round down to integer</td></tr>
+            <tr><td><code>ceil(x)</code>, <code>ceiling(x)</code></td><td>Round up to integer</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <caption>Special functions</caption>
+          <thead><tr><th>Function syntax</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>gamma(x)</code></td><td>Gamma function, Γ(x)</td></tr>
+            <tr><td><code>factorial(x)</code></td><td>Factorial, x! (continuous via Γ)</td></tr>
+            <tr><td><code>loggamma(x)</code></td><td>Log-gamma, ln Γ(x)</td></tr>
+            <tr><td><code>digamma(x)</code></td><td>Digamma, ψ(x) = Γ′/Γ</td></tr>
+            <tr><td><code>polygamma(n, x)</code></td><td>Polygamma of order n</td></tr>
+            <tr><td><code>beta(x, a)</code></td><td>Beta function, B(x, a)</td></tr>
+            <tr><td><code>erf(x)</code></td><td>Error function</td></tr>
+            <tr><td><code>erfc(x)</code></td><td>Complementary error function</td></tr>
+            <tr><td><code>zeta(x)</code></td><td>Riemann zeta function, ζ(x)</td></tr>
+            <tr><td><code>Si(x)</code>, <code>Ci(x)</code></td><td>Sine / cosine integral</td></tr>
+            <tr><td><code>Ei(x)</code>, <code>li(x)</code></td><td>Exponential / logarithmic integral</td></tr>
+            <tr><td><code>besselj(n, x)</code>, <code>bessely(n, x)</code></td><td>Bessel functions Jₙ, Yₙ</td></tr>
+            <tr><td><code>besseli(n, x)</code>, <code>besselk(n, x)</code></td><td>Modified Bessel functions Iₙ, Kₙ</td></tr>
+            <tr><td><code>LambertW(x)</code>, <code>W(x)</code></td><td>Lambert W function</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <caption>Constants</caption>
+          <thead><tr><th>Function syntax</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>pi</code></td><td>π ≈ 3.14159</td></tr>
+            <tr><td><code>e</code></td><td>Euler's number ≈ 2.71828</td></tr>
+          </tbody>
+        </table>
+
+      </div>
+    </details>
+  </section>
+
+  <!-- Hidden template — copied for each new curve row. -->
+  <template id="curve-row-template">
+    <div class="curve-row">
+      <input type="text" class="curve-expr" placeholder="e.g. x*sin(x)"
+             autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input type="color" class="curve-color" title="Curve color">
+      <button type="button" class="curve-remove" title="Remove" aria-label="Remove">×</button>
+    </div>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
