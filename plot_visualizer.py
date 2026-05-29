@@ -1,13 +1,3 @@
-"""
-TO BE DONE:
-- Input of multiple functions
-- Complete LaTeX parser (Tree-sitter)
-- Automatic domain recogniser (use wolfram alpha?)
-- App creation (Textual)
-- Implement gamma function and others
-- Add readable ReadMe.md
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 import re

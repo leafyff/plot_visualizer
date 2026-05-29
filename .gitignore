@@ -1,0 +1,57 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment and local config files
+.env
+.env.*
+*.local
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude local files
+.claude/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# PyInstaller
+*.spec
+*.manifest
+*.toc
+*.pkg
+*.pyz
+*.pyzw
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
